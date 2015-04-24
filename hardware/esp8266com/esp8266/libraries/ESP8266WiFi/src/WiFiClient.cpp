@@ -74,17 +74,26 @@ WiFiClient& ICACHE_FLASH_ATTR  WiFiClient::operator=(const WiFiClient& other)
 }
 
 
+
 int ICACHE_FLASH_ATTR  WiFiClient::connect(const char* host, uint16_t port) 
 {
+    return connect(host, port, false);
+}
+int ICACHE_FLASH_ATTR  WiFiClient::connect(const char* host, uint16_t port, bool nonblocking) {
     IPAddress remote_addr;
     if (WiFi.hostByName(host, remote_addr))
     {
-        return connect(remote_addr, port);
+        return connect(remote_addr, port, nonblocking);
     }
     return 0;
 }
 
 int ICACHE_FLASH_ATTR  WiFiClient::connect(IPAddress ip, uint16_t port) 
+{
+    return connect(ip, port, false);
+}
+
+int ICACHE_FLASH_ATTR  WiFiClient::connect(IPAddress ip, uint16_t port, bool nonblocking) 
 {
     if (_client)
         stop();
@@ -99,7 +108,7 @@ int ICACHE_FLASH_ATTR  WiFiClient::connect(IPAddress ip, uint16_t port)
     tcp_err(pcb, &WiFiClient::_s_err);
     tcp_connect(pcb, &addr, port, reinterpret_cast<tcp_connected_fn>(&WiFiClient::_s_connected));
 
-    esp_yield();
+    if (!nonblocking) esp_yield();
     if (_client)
         return 1;
 
