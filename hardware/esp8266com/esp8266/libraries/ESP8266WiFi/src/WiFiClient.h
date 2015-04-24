@@ -42,8 +42,8 @@ public:
   uint8_t status();
   virtual int connect(IPAddress ip, uint16_t port);
   virtual int connect(const char *host, uint16_t port);
-  virtual int connect(IPAddress ip, uint16_t port, bool nonblocking = false);
-  virtual int connect(const char *host, uint16_t port, bool nonblocking = false);
+  virtual int connect(IPAddress ip, uint16_t port, bool nonblocking);
+  virtual int connect(const char *host, uint16_t port, bool nonblocking);
   virtual size_t write(uint8_t);
   virtual size_t write(const uint8_t *buf, size_t size);
   virtual int available();
