@@ -42,6 +42,9 @@ typedef enum {
 #define wdt_disable()       ESP.wdtDisable()
 #define wdt_reset()         ESP.wdtFeed()
 
+#define cli()        ets_intr_lock()       // IRQ Disable
+#define sei()        ets_intr_unlock()     // IRQ Enable
+
 enum WakeMode {
     WAKE_RF_DEFAULT = 0, // RF_CAL or not after deep-sleep wake up, depends on init data byte 108.
     WAKE_RFCAL = 1,      // RF_CAL after deep-sleep wake up, there will be large current.
@@ -49,12 +52,21 @@ enum WakeMode {
     WAKE_RF_DISABLED = 4 // disable RF after deep-sleep wake up, just like modem sleep, there will be the smallest current.
 };
 
+typedef enum {
+     FM_QIO = 0x00,
+     FM_QOUT = 0x01,
+     FM_DIO = 0x02,
+     FM_DOUT = 0x03,
+     FM_UNKNOWN = 0xff
+} FlashMode_t;
+
 class EspClass {
     public:
         EspClass();
 
         // TODO: figure out how to set WDT timeout
         void wdtEnable(uint32_t timeout_ms = 0);
+        // note: setting the timeout value is not implemented at the moment
         void wdtEnable(WDTO_t timeout_ms = WDTO_0MS);
 
         void wdtDisable(void);
@@ -62,22 +74,36 @@ class EspClass {
 
         void deepSleep(uint32_t time_us, WakeMode mode = WAKE_RF_DEFAULT);
 
-
         void reset(void);
         void restart(void);
-        uint16_t getVCC(void);
+
+        uint16_t getVcc(void);
         uint32_t getFreeHeap(void);
 
         uint32_t getChipId(void);
 
-        const char * getSDKversion(void);
+        const char * getSdkVersion(void);
 
         uint8_t getBootVersion(void);
         uint8_t getBootMode(void);
 
-        uint8_t getCPUfreqMHz(void);
+        uint8_t getCpuFreqMHz(void);
 
+        uint32_t getFlashChipId(void);
+        uint32_t getFlashChipSize(void);
+        uint32_t getFlashChipSpeed(void);
+        FlashMode_t getFlashChipMode(void);
+        uint32_t getFlashChipSizeByChipId(void);
+
+        inline uint32_t getCycleCount(void);
 };
+
+uint32_t EspClass::getCycleCount(void)
+{
+    uint32_t ccount;
+    __asm__ __volatile__("rsr %0,ccount":"=a" (ccount));
+    return ccount;
+}
 
 extern EspClass ESP;
 

@@ -169,6 +169,7 @@ class ClientContext {
 
             _size_sent = will_send;
             DEBUGV(":wr\r\n");
+            tcp_output( _pcb );
             _send_waiting = true;
             tcp_output(_pcb);
             _send_waiting = false;
