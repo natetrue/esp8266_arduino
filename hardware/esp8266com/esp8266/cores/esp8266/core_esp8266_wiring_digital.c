@@ -25,6 +25,8 @@
 #include "eagle_soc.h"
 #include "ets_sys.h"
 
+uint8_t esp8266_gpioToFn[16] = {0x34, 0x18, 0x38, 0x14, 0x3C, 0x40, 0x1C, 0x20, 0x24, 0x28, 0x2C, 0x30, 0x04, 0x08, 0x0C, 0x10};
+
 extern void __pinMode(uint8_t pin, uint8_t mode) {
   if(pin < 16){
     if(mode == SPECIAL){
@@ -50,6 +52,16 @@ extern void __pinMode(uint8_t pin, uint8_t mode) {
           GPF(pin) |= (1 << GPFPU);  // Enable  Pullup
       } else if(mode == INPUT_PULLDOWN) {
           GPF(pin) |= (1 << GPFPD);  // Enable  Pulldown
+      }
+    } else if(mode == WAKEUP_PULLUP || mode == WAKEUP_PULLDOWN){
+      GPF(pin) = GPFFS(GPFFS_GPIO(pin));//Set mode to GPIO
+      GPEC = (1 << pin); //Disable
+      if(mode == WAKEUP_PULLUP) {
+          GPF(pin) |= (1 << GPFPU);  // Enable  Pullup
+          GPC(pin) = (1 << GPCD) | (4 << GPCI) | (1 << GPCWE); //SOURCE(GPIO) | DRIVER(OPEN_DRAIN) | INT_TYPE(LOW) | WAKEUP_ENABLE(ENABLED)
+      } else {
+          GPF(pin) |= (1 << GPFPD);  // Enable  Pulldown
+          GPC(pin) = (1 << GPCD) | (5 << GPCI) | (1 << GPCWE); //SOURCE(GPIO) | DRIVER(OPEN_DRAIN) | INT_TYPE(HIGH) | WAKEUP_ENABLE(ENABLED)
       }
     }
   } else if(pin == 16){
@@ -111,7 +123,11 @@ void interrupt_handler(void *arg) {
     while(!(changedbits & (1 << i))) i++;
     changedbits &= ~(1 << i);
     interrupt_handler_t *handler = &interrupt_handlers[i];
-    if(((handler->mode & 1) == digitalRead(i)) && handler->fn) handler->fn();
+    if (handler->fn && 
+        (handler->mode == CHANGE || 
+         (handler->mode & 1) == digitalRead(i))) {
+      handler->fn();
+    }
   }
   ETS_GPIO_INTR_ENABLE();
 }

@@ -32,6 +32,9 @@ extern "C" {
 #include "WiFiClient.h"
 #include "WiFiServer.h"
 
+#define WIFI_SCAN_RUNNING   (-1)
+#define WIFI_SCAN_FAILD     (-2)
+
 enum WiFiMode { WIFI_OFF = 0, WIFI_STA = 1, WIFI_AP = 2, WIFI_AP_STA = 3 };
 
 class ESP8266WiFiClass
@@ -42,22 +45,23 @@ public:
 
     void mode(WiFiMode);
         
-    
-    /* Start Wifi connection for OPEN networks
-     *
-     * param ssid: Pointer to the SSID string.
+    /**
+     * Start Wifi connection
+     * if passphrase is set the most secure supported mode will be automatically selected
+     * @param ssid const char*          Pointer to the SSID string.
+     * @param passphrase const char *   Optional. Passphrase. Valid characters in a passphrase must be between ASCII 32-126 (decimal).
+     * @param bssid uint8_t[6]          Optional. BSSID / MAC of AP
+     * @param channel                   Optional. Channel of AP
+     * @return
      */
-    int begin(const char* ssid);
+    int begin(const char* ssid, const char *passphrase = NULL, int32_t channel = 0, uint8_t bssid[6] = NULL);
+    int begin(char* ssid, char *passphrase = NULL, int32_t channel = 0, uint8_t bssid[6] = NULL);
 
-    /* Start Wifi connection with passphrase
-     * the most secure supported mode will be automatically selected
-     *
-     * param ssid: Pointer to the SSID string.
-     * param passphrase: Passphrase. Valid characters in a passphrase
-     *        must be between ASCII 32-126 (decimal).
-     */
-    int begin(const char* ssid, const char *passphrase);
 
+   /* Wait for Wifi connection to reach a result
+    * returns the status reached or disconnect if STA is off
+    */
+    uint8_t waitForConnectResult();
 
     /* Set up an open access point
      *
@@ -71,9 +75,9 @@ public:
      * param ssid: Pointer to the SSID string.
      * param passphrase: Pointer to passphrase, 8 characters min.
      * param channel: WiFi channel number, 1 - 13.
+     * param ssid_hidden: Network cloaking? 0 = broadcast SSID, 1 = hide SSID
      */
-    void softAP(const char* ssid, const char* passphrase, int channel = 1);
-
+    void softAP(const char* ssid, const char* passphrase, int channel = 1, int ssid_hidden = 0);
 
     /* Change Ip configuration settings disabling the dhcp client
         *
@@ -83,6 +87,15 @@ public:
         */
     void config(IPAddress local_ip, IPAddress gateway, IPAddress subnet);
 
+	/* Change Ip configuration settings disabling the dhcp client
+        *
+        * param local_ip: 	Static ip configuration
+        * param gateway: 	Static gateway configuration
+        * param subnet:		Static Subnet mask
+		* param dns: 		Defined DNS
+        */
+    void config(IPAddress local_ip, IPAddress gateway, IPAddress subnet, IPAddress dns);
+	
     /* Configure access point
      *
      * param local_ip: access point IP
@@ -102,15 +115,19 @@ public:
      * Get the station interface MAC address.
      *
      * return: pointer to uint8_t array with length WL_MAC_ADDR_LENGTH
+     * return: String
      */
     uint8_t* macAddress(uint8_t* mac);
+    String macAddress(void);
 
     /*
      * Get the softAP interface MAC address.
      *
      * return: pointer to uint8_t array with length WL_MAC_ADDR_LENGTH
+     * return: String
      */
     uint8_t* softAPmacAddress(uint8_t* mac);
+    String softAPmacAddress(void);
 
     /*
      * Get the station interface IP address.
@@ -148,20 +165,54 @@ public:
     char* SSID();
 
     /*
-     * Return the current network RSSI. Note: this is just a stub, there is no way to
-     *  get the RSSI in the Espressif SDK yet.
+     * Return the current bssid / mac associated with the network if configured
      *
-     * return: RSSI value (currently 0)
+     * return: bssid uint8_t *
+     */
+    uint8_t * BSSID(void);
+
+    /*
+     * Return the current bssid / mac associated with the network if configured
+     *
+     * return: bssid string
+     */
+    String BSSIDstr(void);
+
+    /*
+     * Return the current channel associated with the network
+     *
+     * return: channel
+     */
+    int32_t channel(void);
+
+    /*
+     * Return the current network RSSI.
+     *
+     * return: RSSI value
      */
 
-    int32_t RSSI() { return 0; }
+    int32_t RSSI();
+
+
+    /*
+     * called to get the scan state in Async mode
+     *
+     * return -1 if scan not fin
+     * return -2 if scan not triggered
+     */
+    int8_t scanComplete();
+
+    /*
+     * delete last scan result from RAM
+     */
+    void scanDelete();
 
     /*
      * Start scan WiFi networks available
      *
      * return: Number of discovered networks
      */
-    int8_t scanNetworks();
+    int8_t scanNetworks(bool async = false);
 
     /*
      * Return the SSID discovered during the network scan.
@@ -190,12 +241,55 @@ public:
      */
     int32_t RSSI(uint8_t networkItem);
 
+
+    /**
+     * return MAC / BSSID of scanned wifi
+     * @param networkItem specify from which network item want to get the information
+     * @return uint8_t * MAC / BSSID of scanned wifi
+     */
+    uint8_t * BSSID(uint8_t networkItem);
+
+    /**
+     * return MAC / BSSID of scanned wifi
+     * @param networkItem specify from which network item want to get the information
+     * @return String MAC / BSSID of scanned wifi
+     */
+    String BSSIDstr(uint8_t networkItem);
+
+    /**
+     * return channel of scanned wifi
+     * @param networkItem specify from which network item want to get the information
+     * @return uint32_t channel of scanned wifi
+     */
+    int32_t channel(uint8_t networkItem);
+
+    /**
+     * return if the scanned wifi is Hidden (no SSID)
+     * @param networkItem specify from which network item want to get the information
+     * @return bool (true == hidden)
+     */
+    bool isHidden(uint8_t networkItem);
+
+    /**
+     * loads all infos from a scanned wifi in to the ptr parameters
+     * @param networkItem uint8_t
+     * @param ssid  const char**
+     * @param encryptionType uint8_t *
+     * @param RSSI int32_t *
+     * @param BSSID uint8_t **
+     * @param channel int32_t *
+     * @param isHidden bool *
+     * @return (true if ok)
+     */
+    bool getNetworkInfo(uint8_t networkItem, String &ssid, uint8_t &encryptionType, int32_t &RSSI, uint8_t* &BSSID, int32_t &channel, bool &isHidden);
+
+
     /*
      * Return Connection status.
      *
      * return: one of the value defined in wl_status_t
      */
-    uint8_t status();
+    wl_status_t status();
 
     /*
      * Resolve the given hostname to an IP address.
@@ -236,8 +330,18 @@ public:
 protected:
     static void _scanDone(void* result, int status);
     void * _getScanInfoByIndex(int i);
-    static void _smartConfigDone(void* result);
-    bool _smartConfigStarted = false;
+    static void _smartConfigCallback(uint32_t status, void* result);
+    static void _eventCallback(void *event);
+    bool _smartConfigStarted;
+    bool _smartConfigDone;
+
+    bool _useApMode;
+    bool _useClientMode;
+	bool _useStaticIp;
+	
+	static bool _scanAsync;
+	static bool _scanStarted;
+	static bool _scanComplete;
 
     static size_t _scanCount;
     static void* _scanResult;

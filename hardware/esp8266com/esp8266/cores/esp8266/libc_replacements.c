@@ -36,8 +36,10 @@
 #include "osapi.h"
 #include "mem.h"
 #include "user_interface.h"
+#include "debug.h"
 
 void* malloc(size_t size) {
+    size = ((size + 3) & ~((size_t)0x3));
     return os_malloc(size);
 }
 
@@ -46,6 +48,7 @@ void free(void* ptr) {
 }
 
 void* realloc(void* ptr, size_t size) {
+    size = ((size + 3) & ~((size_t)0x3));
     return os_realloc(ptr, size);
 }
 
@@ -82,38 +85,6 @@ int snprintf(char* buffer, size_t size, const char* format, ...) {
 
 int vsnprintf(char * buffer, size_t size, const char * format, va_list arg) {
     return ets_vsnprintf(buffer, size, format, arg);
-}
-
-int memcmp(const void *s1, const void *s2, size_t n) {
-    return ets_memcmp(s1, s2, n);
-}
-
-void* memcpy(void *dest, const void *src, size_t n) {
-    return ets_memcpy(dest, src, n);
-}
-
-void* memset(void *s, int c, size_t n) {
-    return ets_memset(s, c, n);
-}
-
-int strcmp(const char *s1, const char *s2) {
-    return ets_strcmp(s1, s2);
-}
-
-char* strcpy(char *dest, const char *src) {
-    return ets_strcpy(dest, src);
-}
-
-size_t strlen(const char *s) {
-    return ets_strlen(s);
-}
-
-int strncmp(const char *s1, const char *s2, size_t len) {
-    return ets_strncmp(s1, s2, len);
-}
-
-char* strncpy(char * dest, const char * src, size_t n) {
-    return ets_strncpy(dest, src, n);
 }
 
 size_t ICACHE_FLASH_ATTR strnlen(const char *s, size_t len) {
@@ -157,70 +128,74 @@ char* ICACHE_FLASH_ATTR strcat(char * dest, const char * src) {
 }
 
 char* ICACHE_FLASH_ATTR strncat(char * dest, const char * src, size_t n) {
-    uint32_t offset = strlen(dest);
-    for(uint32_t i = 0; i < n; i++) {
-        *(dest + i + offset) = *(src + i);
-        if(*(src + i) == 0x00) {
-            break;
-        }
+    size_t i;
+    size_t offset = strlen(dest);
+    for(i = 0; i < n && src[i]; i++) {
+        dest[i + offset] = src[i];
     }
+    dest[i + offset] = 0;
     return dest;
 }
 
+char* ICACHE_FLASH_ATTR strtok_r(char* s, const char* delim, char** last) {
+    const char* spanp;
+    char* tok;
+    char c;
+    char sc;
 
-char* ICACHE_FLASH_ATTR strtok_r(char * str, const char * delimiters, char ** temp) {
-    static char * ret = NULL;
-    char * start = NULL;
-    char * end = NULL;
-    uint32_t size = 0;
+    if (s == NULL && (s = *last) == NULL) {
+        return (NULL);
+    }
 
-    if(str == NULL) {
-        if(temp == NULL) {
-            return NULL;
+
+    // Skip (span) leading delimiters 
+    //
+cont:
+    c = *s++;
+    for (spanp = delim; (sc = *spanp++) != 0;) {
+        if (c == sc) {
+            goto cont;
         }
-        start = *temp;
-    } else {
-        start = str;
     }
 
-    if(start == NULL) {
-        return NULL;
+    // check for no delimiters left
+    //
+    if (c == '\0') {
+        *last = NULL;
+        return (NULL);
     }
 
-    if(delimiters == NULL) {
-        return NULL;
-    }
+    tok = s - 1;
 
-    end = start;
 
-    while(1) {
-        for(uint16_t i = 0; i < strlen(delimiters); i++) {
-            if(*end == *(delimiters + i)) {
-                break;
+    // Scan token 
+    // Note that delim must have one NUL; we stop if we see that, too.
+    //
+    for (;;) {
+        c = *s++;
+        spanp = (char *)delim;
+        do {
+            if ((sc = *spanp++) == c) {
+                if (c == 0) {
+                    s = NULL;
+                }
+                else {
+                    s[-1] = '\0';
+                }
+                *last = s;
+                return (tok);
             }
-        }
-        end++;
-        if(*end == 0x00) {
-            break;
-        }
+
+        } while (sc != 0);
     }
 
-    *temp = end;
-
-    if(ret != NULL) {
-        free(ret);
-    }
-
-    size = (end - start);
-    ret = (char *) malloc(size);
-    strncpy(ret, start, size);
-    return ret;
+    // NOTREACHED EVER
 }
 
-char* ICACHE_FLASH_ATTR strtok(char * str, const char * delimiters) {
-    static char * ret = NULL;
-    ret = strtok_r(str, delimiters, &ret);
-    return ret;
+char* ICACHE_FLASH_ATTR strtok(char* s, const char* delim) {
+    static char* last;
+
+    return (strtok_r(s, delim, &last));
 }
 
 int ICACHE_FLASH_ATTR strcasecmp(const char * str1, const char * str2) {
@@ -464,75 +439,7 @@ int isblank(int c) {
 static int errno_var = 0;
 
 int* ICACHE_FLASH_ATTR __errno(void) {
-    os_printf("__errno is called last error: %d (not current)\n", errno_var);
+    DEBUGV("__errno is called last error: %d (not current)\n", errno_var);
     return &errno_var;
-}
-
-// ##########################################################################
-//                     __ieee754  functions
-// ##########################################################################
-
-double ICACHE_FLASH_ATTR __ieee754_sinh(double x) {
-    return sinh(x);
-}
-
-double ICACHE_FLASH_ATTR __ieee754_hypot(double x, double y) {
-    return hypot(x, y);
-}
-
-float ICACHE_FLASH_ATTR __ieee754_hypotf(float x, float y) {
-    return hypotf(x, y);
-}
-
-float ICACHE_FLASH_ATTR __ieee754_logf(float x) {
-    return logf(x);
-}
-
-double ICACHE_FLASH_ATTR __ieee754_log10(double x) {
-    return log10(x);
-}
-
-double ICACHE_FLASH_ATTR __ieee754_exp(double x) {
-    return exp(x);
-}
-
-double ICACHE_FLASH_ATTR __ieee754_cosh(double x) {
-    return cosh(x);
-}
-
-float ICACHE_FLASH_ATTR __ieee754_expf(float x) {
-    return expf(x);
-}
-
-float ICACHE_FLASH_ATTR __ieee754_log10f(float x) {
-    return log10f(x);
-}
-
-double ICACHE_FLASH_ATTR __ieee754_atan2(double x, double y) {
-    return atan2(x, y);
-}
-
-float ICACHE_FLASH_ATTR __ieee754_sqrtf(float x) {
-    return sqrtf(x);
-}
-
-float ICACHE_FLASH_ATTR __ieee754_sinhf(float x) {
-    return sinhf(x);
-}
-
-double ICACHE_FLASH_ATTR __ieee754_log(double x) {
-    return log(x);
-}
-
-double ICACHE_FLASH_ATTR __ieee754_sqrt(double x) {
-    return sqrt(x);
-}
-
-float ICACHE_FLASH_ATTR __ieee754_coshf(float x) {
-    return coshf(x);
-}
-
-float ICACHE_FLASH_ATTR __ieee754_atan2f(float x, float y) {
-    return atan2f(x, y);
 }
 

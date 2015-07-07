@@ -26,10 +26,12 @@ extern "C" {
 }
 
 void *operator new(size_t size) {
+    size = ((size + 3) & ~((size_t)0x3));
     return os_malloc(size);
 }
 
 void *operator new[](size_t size) {
+    size = ((size + 3) & ~((size_t)0x3));
     return os_malloc(size);
 }
 
@@ -55,6 +57,14 @@ void __cxa_deleted_virtual(void) {
 namespace std {
 void __throw_bad_function_call() {
     abort();
+}
+
+void __throw_length_error(char const*) {
+	abort();
+}
+
+void __throw_bad_alloc() {
+	abort();
 }
 }
 

@@ -1,6 +1,6 @@
 /*
   WiFiUdp.h - Library for Arduino Wifi shield.
-  Copyright (c) 2011-2014 Arduino.  All right reserved.
+  Copyright (c) 2011-2014 Arduino LLC.  All right reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -23,12 +23,13 @@
 #define WIFIUDP_H
 
 #include <Udp.h>
+#include <include/slist.h>
 
 #define UDP_TX_PACKET_MAX_SIZE 8192
 
 class UdpContext;
 
-class WiFiUDP : public UDP {
+class WiFiUDP : public UDP, public SList<WiFiUDP> {
 private:
   UdpContext* _ctx;
 
@@ -102,6 +103,8 @@ public:
   IPAddress destinationIP();
   // Return the local port for outgoing packets
   uint16_t localPort();
+
+  static void stopAll();
 
 };
 

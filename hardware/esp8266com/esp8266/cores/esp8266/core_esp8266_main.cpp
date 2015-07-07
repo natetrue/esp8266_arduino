@@ -34,6 +34,8 @@ extern "C" {
 #define LOOP_TASK_PRIORITY 0
 #define LOOP_QUEUE_SIZE    1
 
+struct rst_info resetInfo;
+
 int atexit(void (*func)()) {
     return 0;
 }
@@ -57,7 +59,7 @@ void preloop_update_frequency() {
 extern void (*__init_array_start)(void);
 extern void (*__init_array_end)(void);
 
-static cont_t g_cont;
+cont_t g_cont __attribute__ ((aligned (16)));
 static os_event_t g_loop_queue[LOOP_QUEUE_SIZE];
 
 static uint32_t g_micros_at_task_start;
@@ -112,12 +114,18 @@ static void do_global_ctors(void) {
 }
 
 void init_done() {
+    system_set_os_print(1);
     do_global_ctors();
     esp_schedule();
 }
 
 extern "C" {
 void user_init(void) {
+    struct rst_info *rtc_info_ptr = system_get_rst_info();
+
+    memcpy((void *) &resetInfo, (void *) rtc_info_ptr, sizeof(resetInfo));
+
+
     uart_div_modify(0, UART_CLK_FREQ / (115200));
 
     init();

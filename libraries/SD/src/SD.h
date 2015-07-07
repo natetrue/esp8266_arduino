@@ -93,19 +93,32 @@ public:
   // write, etc). Returns a File object for interacting with the file.
   // Note that currently only one file can be open at a time.
   File open(const char *filename, uint8_t mode = FILE_READ);
+  File open(const String &filename, uint8_t mode = FILE_READ) { return open( filename.c_str(), mode ); }
 
   // Methods to determine if the requested file path exists.
   boolean exists(char *filepath);
+  boolean exists(const String &filepath) { return exists(filepath.c_str()); }
 
   // Create the requested directory heirarchy--if intermediate directories
   // do not exist they will be created.
   boolean mkdir(char *filepath);
+  boolean mkdir(const String &filepath) { return mkdir(filepath.c_str()); }
   
   // Delete the file.
   boolean remove(char *filepath);
+  boolean remove(const String &filepath) { return remove(filepath.c_str()); }
   
   boolean rmdir(char *filepath);
+  boolean rmdir(const String &filepath) { return rmdir(filepath.c_str()); }
 
+  uint8_t type(){ return card.type(); }
+  uint8_t fatType(){ return volume.fatType(); }
+  size_t blocksPerCluster(){ return volume.blocksPerCluster(); }
+  size_t totalClusters(){ return volume.clusterCount(); }
+  size_t blockSize(){ return (size_t)0x200; }
+  size_t totalBlocks(){ return (totalClusters() / blocksPerCluster()); }
+  size_t clusterSize(){ return blocksPerCluster() * blockSize(); }
+  size_t size(){ return (clusterSize() * totalClusters()); }
 private:
 
   // This is used to determine the mode used to open a file

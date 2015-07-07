@@ -101,7 +101,8 @@ void ESP8266WebServer::handleClient()
 #endif
 
   // Wait for data from client to become available
-  while(client.connected() && !client.available()){
+  uint16_t maxWait = HTTP_MAX_DATA_WAIT;
+  while(client.connected() && !client.available() && maxWait--){
     delay(1);
   }
 
@@ -110,10 +111,11 @@ void ESP8266WebServer::handleClient()
   }
 
   _currentClient = client;
+  _contentLength = CONTENT_LENGTH_NOT_SET;
   _handleRequest();
 }
 
-void ESP8266WebServer::sendHeader(String name, String value, bool first) {
+void ESP8266WebServer::sendHeader(const String& name, const String& value, bool first) {
   String headerLine = name;
   headerLine += ": ";
   headerLine += value;
@@ -127,7 +129,7 @@ void ESP8266WebServer::sendHeader(String name, String value, bool first) {
   }
 }
 
-void ESP8266WebServer::send(int code, const char* content_type, String content) {
+void ESP8266WebServer::send(int code, const char* content_type, const String& content) {
   String response = "HTTP/1.1 ";
   response += String(code);
   response += " ";
@@ -136,7 +138,15 @@ void ESP8266WebServer::send(int code, const char* content_type, String content) 
 
   if (!content_type)
     content_type = "text/html";
+  
   sendHeader("Content-Type", content_type, true);
+  if (_contentLength != CONTENT_LENGTH_UNKNOWN && _contentLength != CONTENT_LENGTH_NOT_SET) {
+    sendHeader("Content-Length", String(_contentLength).c_str());
+  } else if(content.length() > 0){
+    sendHeader("Content-Length", String(content.length()).c_str());
+  }
+  sendHeader("Connection", "close");
+  sendHeader("Access-Control-Allow-Origin", "*");
   
   response += _responseHeaders;
   response += "\r\n";
@@ -145,7 +155,15 @@ void ESP8266WebServer::send(int code, const char* content_type, String content) 
   sendContent(response);
 }
 
-void ESP8266WebServer::sendContent(String content) {
+void ESP8266WebServer::send(int code, char* content_type, const String& content) {
+  send(code, (const char*)content_type, content);
+}
+
+void ESP8266WebServer::send(int code, const String& content_type, const String& content) {
+  send(code, (const char*)content_type.c_str(), content);
+}
+
+void ESP8266WebServer::sendContent(const String& content) {
   size_t size_to_send = content.length();
   size_t size_sent = 0;
   while(size_to_send) {
@@ -227,13 +245,19 @@ void ESP8266WebServer::_handleRequest() {
     }
   }
 
+  uint16_t maxWait = HTTP_MAX_CLOSE_WAIT;
+  while(_currentClient.connected() && maxWait--) {
+    delay(1);
+  }
   _currentClient   = WiFiClient();
   _currentUri      = String();
 }
 
 const char* ESP8266WebServer::_responseCodeToString(int code) {
   switch (code) {
+    case 101: return "Switching Protocols";
     case 200: return "OK";
+    case 403: return "Forbidden";
     case 404: return "Not found";
     case 500: return "Fail";
     default:  return "";
