@@ -93,8 +93,6 @@ tools.esptool.upload.protocol=esp
 tools.esptool.upload.params.verbose=-vv
 tools.esptool.upload.params.quiet=
 
-tools.esptool.esptoolpy.pattern=python /Users/natetrue/src/esptool/esptool.py -p "{serial.port}" -b {upload.speed} write_flash 0x00000 "{build.path}/{build.project_name}_00000.bin" 0x10000 "{build.path}/{build.project_name}_10000.bin"
-
 tools.esptool.upload.pattern="{path}/{cmd}" {upload.verbose} -cd {upload.resetmethod} -cb {upload.speed} -cp "{serial.port}" -ca 0x00000 -cf "{build.path}/{build.project_name}.bin"
 tools.esptool.network.pattern=python "{path}/espota.py" "{serial.port}" "{network.port}" "{build.path}/{build.project_name}.bin"
 
